@@ -30,7 +30,6 @@ type CFG struct {
 type OPTS struct {
 	Help bool `short:"h" long:"help" description:"Shows help message"`
 	ConfigFile string `long:"config" description:"Sets the name and location for the config file to use"`
-	Port string `short:"p" long:"port" description:"Specifies the target port to run on"`
 	Verbose []bool `short:"v" long:"verbose" description:"Show verbose debug information -v max of -vv"`
 }
 

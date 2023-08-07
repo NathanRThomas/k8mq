@@ -35,7 +35,7 @@ const serviceName = "K8MQ Server"
 // final local options object for this executable
 var opts struct {
 	models.OPTS
-
+	Port string `short:"p" long:"port" description:"Specifies the target port to run on"`
 }
 
 var cfg struct {
@@ -166,8 +166,8 @@ func main() {
 	// check for a port being set
 	if len(opts.Port) > 0 {
 		cfg.Port = opts.Port // this wins
-	} else if len(cfg.port) == 0 { 
-		cfg.port = "8080"  // give it a default k8 is expecting
+	} else if len(cfg.Port) == 0 { 
+		cfg.Port = "8080"  // give it a default k8 is expecting
 	}
 
 	// early check for flags
