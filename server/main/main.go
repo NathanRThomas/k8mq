@@ -124,8 +124,6 @@ func (this *app) monitorForKill(fn func()) {
 
 // create a default server handler based on our routes
 func (this *app) createServer (port string, wg *sync.WaitGroup, handler http.Handler) *http.Server {
-	if len(port) == 0 { port = "8080" } // give it a default k8 is expecting
-
 	svr := &http.Server {
 		Addr: ":" + port,
 		ErrorLog: this.ErrorLog,
@@ -168,6 +166,8 @@ func main() {
 	// check for a port being set
 	if len(opts.Port) > 0 {
 		cfg.Port = opts.Port // this wins
+	} else if len(cfg.port) == 0 { 
+		cfg.port = "8080"  // give it a default k8 is expecting
 	}
 
 	// early check for flags

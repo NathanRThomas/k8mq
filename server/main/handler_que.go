@@ -21,6 +21,10 @@ import (
 
 // handles a wss error and records it if it's "bad"
 func (this *app) wssErr (err error) {
+	if strings.Contains(err.Error(), "websocket: close 1000") {
+		return // we're cool with this one, normal close status
+	}
+
 	if strings.Contains(err.Error(), "websocket: close 1005") {
 		return // we're cool with this one, expected when the client closes things
 	}

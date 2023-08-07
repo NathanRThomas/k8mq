@@ -11,7 +11,7 @@ package client
 
 import (
 	"github.com/pkg/errors"
-	"golang.org/x/net/websocket"
+	"nhooyr.io/websocket"
 	
 	"fmt"
 	"context"
@@ -19,7 +19,6 @@ import (
 	"time"
 	"log"
 	"math"
-	"io"
 )
 
   //-----------------------------------------------------------------------------------------------------------------------//
@@ -41,10 +40,11 @@ type Client struct {
 	serverUrl string 
 	port int 
 	reader readCallback
-	running bool 
+	ctx context.Context 
+	ctxCancel context.CancelFunc
 	conn *websocket.Conn 	// The websocket connection.
 
-	wg *sync.WaitGroup
+	wgMessages *sync.WaitGroup
 	messages chan *queMessage
 }
 
@@ -53,8 +53,8 @@ type Client struct {
 
 // when a message comes in, we want to 
 func (this *Client) monitorMessages () {
-	this.wg.Add(1)
-	defer this.wg.Done()
+	this.wgMessages.Add(1)
+	defer this.wgMessages.Done()
 
 	for msg := range this.messages {
 		if msg == nil { break } // channel is closed
@@ -65,7 +65,7 @@ func (this *Client) monitorMessages () {
 		ok := false 
 		for i := 0; i < 5; i++ {
 			if this.conn != nil {
-				_, err := this.conn.Write(msg.Msg)
+				err := this.conn.Write(this.ctx, websocket.MessageText, msg.Msg)
 				if err == nil {
 					ok = true 
 					break 
@@ -86,18 +86,21 @@ func (this *Client) monitorMessages () {
 }
 
 func (this *Client) read () {
-	this.wg.Add(1)
-	defer this.wg.Done()
-
-	for this.running {
-		data, err := io.ReadAll (this.conn)
+	for {
+		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
-			this.reader(data)
-		} else {
+			if mType == websocket.MessageText {
+				this.reader(data)
+			}
+		} else if this.ctx.Err() == nil {
 			log.Printf("read error : %v : reconnecting\n", err)
 			this.connect()
+		} else {
+			break // we're done
 		}
 	}
+
+	fmt.Println("exit read")
 }
 
 // handles connecting to the remote server
@@ -105,7 +108,12 @@ func (this *Client) connect () error {
 	var outErr error 
 	// try this with a timeout
 	for i := 0; i < 5; i++ {
-		conn, err := websocket.Dial (fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), "", "http://k8mq-client")
+		if this.ctx.Err() != nil { return nil } // bail, we're closing
+
+		ctx, cancel := context.WithTimeout(this.ctx, time.Second * 5)
+		defer cancel()
+
+		conn, _, err := websocket.Dial (ctx, fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), nil)
 		if err == nil {
 			this.conn = conn // we're good, copy this over
 			return nil 
@@ -120,12 +128,10 @@ func (this *Client) connect () error {
 
 // closes things and waits in its own thread
 func (this *Client) closeAndWait (ch chan bool) {
-	this.running = false // shut it down
-
 	// close all the channels
 	close(this.messages)
 
-	this.wg.Wait() // wait for the threads to finish
+	this.wgMessages.Wait() // wait for the threads to finish
 	// they fininshed, so set the channel
 	ch <- true 
 }
@@ -144,7 +150,9 @@ func (this *Client) Close (tm time.Duration) error {
 	select {
 	case <- done:
 		// we finished normally and expectidly 
-		this.conn.Close() // close this, we're done with it
+		this.ctxCancel() // shut it down
+		this.conn.Close(websocket.StatusNormalClosure, "")
+		
 
 	case <-ctx.Done():
 		// this is bad, means the context timed out before things finished
@@ -174,9 +182,11 @@ func NewClient (serverUrl string, port int, reader readCallback) (*Client, error
 	ret := &Client{
 		serverUrl: serverUrl,
 		port: port,
-		running: true,
 		reader: reader,
 	}
+
+	// using context to coordinate closing things
+	ret.ctx, ret.ctxCancel = context.WithCancel(context.Background())
 
 	// first step, let's try to connec to our server, if that doesn't work then we're done pretty quick
 	err := ret.connect()
@@ -184,7 +194,7 @@ func NewClient (serverUrl string, port int, reader readCallback) (*Client, error
 	
 	ret.messages = make (chan *queMessage, 100) // this should be happening real quick, but there is a concern if the server is unreachable
 
-	ret.wg = new(sync.WaitGroup)
+	ret.wgMessages = new(sync.WaitGroup)
 	
 	go ret.monitorMessages() // monitor this channel as well
 	go ret.read() // fire off the reader
