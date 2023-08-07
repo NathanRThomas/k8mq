@@ -40,7 +40,11 @@ func (this *app) wssErr (err error) {
 // websocket entry point
 func (this *app) wssHandle (w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context() // pass to the connect to test context to see if it's bad?
-	var upgrader = websocket.Upgrader{} // use default options
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

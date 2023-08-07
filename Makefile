@@ -1,8 +1,21 @@
 
-build:
-	clear
-	@echo "building voyager"
-	@go build ./...
+# go params
+GOCMD=go
+GOBUILD=$(GOCMD) build -buildvcs=false
+GOTEST=$(GOCMD) test -v -run
+GOPATH=/usr/local/bin
+DIR=$(shell pwd)
+
+build: build-server 
+build: build-client 
+
+build-server:
+	@echo "building k8mq server"
+	@$(GOBUILD) -o $(GOPATH)/k8mq-server ./server/main/
+
+build-client:
+	@echo "building k8mq client"
+	@$(GOBUILD) ./client/...
 
 update:
 	clear
@@ -12,5 +25,10 @@ update:
 
 test:
 	@clear 
-	@echo "testing..."
-	@go test ./...
+	@echo "testing QA..."
+	@$(GOTEST) QA ./...
+
+test-net:
+	@clear 
+	@echo "testing NET..."
+	@$(GOTEST) Net ./...

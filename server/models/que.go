@@ -33,7 +33,6 @@ type queMessage struct {
 }
 
 type Que struct {
-	running bool 
 	list []*queConn
 	wg *sync.WaitGroup
 	inConnection chan *queConn
@@ -145,9 +144,7 @@ func (this *Que) NewMsg (msg []byte) {
 // sending of messages to existing connections
 // and closing connections that are no longer open
 func NewQue () *Que {
-	ret := &Que{
-		running: true,
-	}
+	ret := &Que{}
 
 	ret.list = make([]*queConn, 0, 10) // TODO set some capacity so things load faster?
 
