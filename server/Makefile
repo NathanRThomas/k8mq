@@ -25,3 +25,7 @@ test-net:
 	@clear 
 	@echo "testing NET..."
 	@$(GOTEST) Net ./...
+
+run: build
+run:
+	@k8mq-server -p 5555 -vv

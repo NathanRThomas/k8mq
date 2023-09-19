@@ -89,7 +89,7 @@ func (this *Client) read () {
 	for {
 		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
-			if mType == websocket.MessageText {
+			if mType == websocket.MessageText && this.reader != nil {
 				this.reader(data)
 			}
 		} else if this.ctx.Err() == nil {
@@ -129,9 +129,14 @@ func (this *Client) connect () error {
 // closes things and waits in its own thread
 func (this *Client) closeAndWait (ch chan bool) {
 	// close all the channels
-	close(this.messages)
+	if this.messages != nil {
+		close(this.messages)
+	}
 
-	this.wgMessages.Wait() // wait for the threads to finish
+	if this.wgMessages != nil {
+		this.wgMessages.Wait() // wait for the threads to finish
+	}
+	
 	// they fininshed, so set the channel
 	ch <- true 
 }
