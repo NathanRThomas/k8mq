@@ -133,8 +133,6 @@ func (this *app) createServer (port string, wg *sync.WaitGroup, handler http.Han
 
 	// listen for system interupt signals to quit the handler
 	this.monitorForKill(func(){
-		time.Sleep (time.Second * 5) // for being removed from the load balancer
-
 		// we also need to make sure any background threads have finished, so wait for them here
 		// otherwise we shutdown the server so k8 can't tell if we're happy or not
 		if wg != nil {
