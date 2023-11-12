@@ -12,6 +12,8 @@ package client
 import (
 	"github.com/pkg/errors"
 	"nhooyr.io/websocket"
+
+	"github.com/NathanRThomas/k8mq/server/models"
 	
 	"fmt"
 	"context"
@@ -31,10 +33,6 @@ type readCallback = func([]byte)
  //----- STRUCTS ---------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------------//
 
-type queMessage struct {
-	Msg []byte 
-}
-
 // main object
 type Client struct {
 	serverUrl string 
@@ -45,7 +43,7 @@ type Client struct {
 	conn *websocket.Conn 	// The websocket connection.
 
 	wgMessages *sync.WaitGroup
-	messages chan *queMessage
+	messages chan *models.QueMessage
 }
 
 
@@ -170,7 +168,7 @@ func (this *Client) Close (tm time.Duration) error {
 // adds a new message to go to our server connection
 // this is thread safe
 func (this *Client) NewMsg (msg []byte) {
-	this.messages <- &queMessage {
+	this.messages <- &models.QueMessage {
 		Msg: msg,
 	}
 }
@@ -197,7 +195,7 @@ func NewClient (serverUrl string, port int, reader readCallback) (*Client, error
 	err := ret.connect()
 	if err != nil { return nil, err }
 	
-	ret.messages = make (chan *queMessage, 100) // this should be happening real quick, but there is a concern if the server is unreachable
+	ret.messages = make (chan *models.QueMessage, 100) // this should be happening real quick, but there is a concern if the server is unreachable
 
 	ret.wgMessages = new(sync.WaitGroup)
 	

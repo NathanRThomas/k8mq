@@ -28,7 +28,7 @@ type queConn struct {
 	ctx context.Context // to check if it's still good
 }
 
-type queMessage struct {
+type QueMessage struct {
 	Msg []byte 
 }
 
@@ -36,7 +36,7 @@ type Que struct {
 	list []*queConn
 	wg *sync.WaitGroup
 	inConnection chan *queConn
-	messages chan *queMessage
+	messages chan *QueMessage
 }
 
 
@@ -131,7 +131,7 @@ func (this *Que) AddConnection (ctx context.Context, c *websocket.Conn) {
 // adds a new message to go to all connections
 // this is thread safe
 func (this *Que) NewMsg (msg []byte) {
-	this.messages <- &queMessage {
+	this.messages <- &QueMessage {
 		Msg: msg,
 	}
 }
@@ -149,7 +149,7 @@ func NewQue () *Que {
 	ret.list = make([]*queConn, 0, 10) // TODO set some capacity so things load faster?
 
 	ret.inConnection = make (chan *queConn, 10) // this doesn't need to be large, these should be getting pulled off real quick
-	ret.messages = make (chan *queMessage, 10) // again this should be happening real quick
+	ret.messages = make (chan *QueMessage, 10) // again this should be happening real quick
 
 	ret.wg = new(sync.WaitGroup)
 
