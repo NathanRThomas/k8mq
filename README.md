@@ -3,6 +3,7 @@ Message que designed for for Kubernetes deployments
 
 ***
 ### Example
+```
 func clientReadCallback (b []byte) {
 	log.Printf("clientReadCallback: %s", string(b))
 }
@@ -20,3 +21,4 @@ func TestClient1 (t *testing.T) {
 	err = client.Close(time.Second)
 	if err != nil { t.Fatal(err) }
 }
+```

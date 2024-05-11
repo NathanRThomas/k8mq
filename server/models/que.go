@@ -12,7 +12,6 @@ import (
 	"context"
 	"sync"
 	"time"
-	"log"
 )
 
   //-----------------------------------------------------------------------------------------------------------------------//
@@ -33,6 +32,7 @@ type QueMessage struct {
 }
 
 type Que struct {
+	opts *OPTS
 	list []*queConn
 	wg *sync.WaitGroup
 	inConnection chan *queConn
@@ -52,6 +52,8 @@ func (this *Que) monitorIn () {
 
 		// add it to our list
 		this.list = append (this.list, conn)
+
+		this.opts.Info ("QUE: connection added: %d", len(this.list))
 	}
 }
 
@@ -76,12 +78,13 @@ func (this *Que) monitorMessages () {
 
 				} else {
 					// going to record these for now
-					log.Println("client write failed, removing from que list")
+					this.opts.Warn("client write failed, removing from que list")
 				}
 			} // else the context is gone, so don't include it anymore
 		}
 
 		this.list = newList // copy this over
+		this.opts.Info ("QUE: message sent: %d", len(this.list))
 	}
 }
 
@@ -94,6 +97,7 @@ func (this *Que) closeAndWait (ch chan bool) {
 	this.wg.Wait() // wait for the threads to finish
 	// they fininshed, so set the channel
 	ch <- true 
+	this.opts.Info ("QUE: close and wait")
 }
 
 //----- PUBLIC -----------------------------------------------------------------------------------------------------//
@@ -143,15 +147,13 @@ func (this *Que) NewMsg (msg []byte) {
 // creates a new que object to monitor for incoming connections
 // sending of messages to existing connections
 // and closing connections that are no longer open
-func NewQue () *Que {
-	ret := &Que{}
-
-	ret.list = make([]*queConn, 0, 10) // TODO set some capacity so things load faster?
-
-	ret.inConnection = make (chan *queConn, 10) // this doesn't need to be large, these should be getting pulled off real quick
-	ret.messages = make (chan *QueMessage, 10) // again this should be happening real quick
-
-	ret.wg = new(sync.WaitGroup)
+func NewQue (opts *OPTS) *Que {
+	ret := &Que{
+		opts: opts,
+		inConnection: make(chan *queConn, 10), // this doesn't need to be large, these should be getting pulled off real quick
+		messages: make(chan *QueMessage, 10), // again this should be happening real quick
+		wg: new(sync.WaitGroup),
+	}
 
 	go ret.monitorIn()  // monitor this channel
 	go ret.monitorMessages() // monitor this channel as well

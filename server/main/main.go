@@ -29,19 +29,13 @@ import (
  //----- CONSTS ------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------------------------------------------//
 
-const serviceVersion = "0.0.1"
+const serviceVersion = "0.1.0"
 const serviceName = "K8MQ Server"
 
 // final local options object for this executable
 var opts struct {
 	models.OPTS
-	Port string `short:"p" long:"port" description:"Specifies the target port to run on"`
 }
-
-var cfg struct {
-	models.CFG
-}
-
   //-------------------------------------------------------------------------------------------------------------------//
  //----- PRIVATE FUNCTIONS -------------------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------------------------------------------//
@@ -98,7 +92,7 @@ func (this *app) init() (models.Callback, error) {
 	// default logger for formatted error messages
 	this.ErrorLog = log.New (os.Stderr, "ERROR\t", log.LstdFlags | log.Lmicroseconds | log.Llongfile | log.LUTC)
 
-	this.que = models.NewQue()
+	this.que = models.NewQue(&opts.OPTS)
 	
 	return func() error {
 		// close these in order
@@ -123,9 +117,9 @@ func (this *app) monitorForKill(fn func()) {
 }
 
 // create a default server handler based on our routes
-func (this *app) createServer (port string, wg *sync.WaitGroup, handler http.Handler) *http.Server {
+func (this *app) createServer (port int, wg *sync.WaitGroup, handler http.Handler) *http.Server {
 	svr := &http.Server {
-		Addr: ":" + port,
+		Addr: fmt.Sprintf(":%d", port),
 		ErrorLog: this.ErrorLog,
 		Handler: handler, 
 		ReadTimeout: time.Second * 30,
@@ -153,20 +147,7 @@ func main() {
 	// first step, parse the command line params
 	args := parseCommandLineArgs()
 
-	// parse the config
-	err := models.ParseConfig(&cfg, opts.ConfigFile)
-	if err != nil {
-		log.Fatal(err) // bailing hard
-	}
-
 	opts.Info("Starting %s v%s", serviceName, serviceVersion)
-
-	// check for a port being set
-	if len(opts.Port) > 0 {
-		cfg.Port = opts.Port // this wins
-	} else if len(cfg.Port) == 0 { 
-		cfg.Port = "8080"  // give it a default k8 is expecting
-	}
 
 	// early check for flags
 	for _, arg := range args {
@@ -207,11 +188,11 @@ func main() {
 	// we're good to keep going
 	
 	// create our server for listening for kubernetes health/live checks
-	srv := app.createServer(cfg.Port, nil, app.routes())
+	srv := app.createServer(opts.Port, nil, app.routes())
 
 	app.running = true // this app is now officially running
 
-	log.Printf("%s v%s started on port %s\n", serviceName, serviceVersion, cfg.Port) // going to always record this starting message
+	log.Printf("%s v%s started on port %d\n", serviceName, serviceVersion, opts.Port) // going to always record this starting message
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {            // Error starting or closing listener:
 		log.Printf("Error %s ListenAndServe: %v", serviceName, err) // we want to know if this failed for another reason
 	}

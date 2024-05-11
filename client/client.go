@@ -19,7 +19,6 @@ import (
 	"context"
 	"sync"
 	"time"
-	"log"
 	"math"
 )
 
@@ -35,6 +34,7 @@ type readCallback = func([]byte)
 
 // main object
 type Client struct {
+	opts models.OPTS // used for logging
 	serverUrl string 
 	port int 
 	reader readCallback
@@ -71,6 +71,7 @@ func (this *Client) monitorMessages () {
 			}
 
 			// if we're here, it's cause we couldn't send things, so try again
+			this.opts.Warn("QUE: Unable to write message, sleeping")
 			time.Sleep(time.Second * time.Duration(int(math.Pow(2, float64(i))))) // sleep with a exp backoff
 		}
 
@@ -78,7 +79,8 @@ func (this *Client) monitorMessages () {
 		// also we're clearly not connecting to the k8mq server
 		// so just log it and move on
 		if ok == false {
-			log.Printf("couldn't write to the k8mq server : %s\n", string(msg.Msg))
+			this.opts.Warn("QUE: Failed to write to the k8mq server : re-quing : %s", string(msg.Msg))
+			this.messages <- msg
 		}
 	}
 }
@@ -88,10 +90,11 @@ func (this *Client) read () {
 		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
 			if mType == websocket.MessageText && this.reader != nil {
+				this.opts.Info("QUE: Found message to read : %s", string(data))
 				this.reader(data)
 			}
 		} else if this.ctx.Err() == nil {
-			log.Printf("read error : %v : reconnecting\n", err)
+			this.opts.Warn("QUE: Read error : %v : reconnecting\n", err)
 			this.connect()
 		} else {
 			break // we're done
@@ -106,9 +109,9 @@ func (this *Client) connect () error {
 	var outErr error 
 	// try this with a timeout
 	for i := 0; i < 5; i++ {
-		if this.ctx.Err() != nil { return nil } // bail, we're closing
+		if this.ctx.Err() != nil { return errors.WithStack(this.ctx.Err()) } // bail, we're closing
 
-		ctx, cancel := context.WithTimeout(this.ctx, time.Second * 5)
+		ctx, cancel := context.WithTimeout(this.ctx, time.Second * 3)
 		defer cancel()
 
 		conn, _, err := websocket.Dial (ctx, fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), nil)
@@ -178,7 +181,7 @@ func (this *Client) NewMsg (msg []byte) {
 //-----------------------------------------------------------------------------------------------------------------------//
 
 // creates a new client object to connect, send and receive messages from our server
-func NewClient (serverUrl string, port int, reader readCallback) (*Client, error) {
+func NewClient (serverUrl string, port int, reader readCallback, verbose []bool) (*Client, error) {
 	if len(serverUrl) == 0 { return nil, errors.Errorf("remote K8MQ server url required, eg 'k8mq.default.svc'")}
 	if port == 0 { port = 8080 } // default port
 
@@ -186,7 +189,11 @@ func NewClient (serverUrl string, port int, reader readCallback) (*Client, error
 		serverUrl: serverUrl,
 		port: port,
 		reader: reader,
+		messages: make (chan *models.QueMessage, 100), // this should be happening real quick, but there is a concern if the server is unreachable
+		wgMessages: new(sync.WaitGroup),
 	}
+
+	ret.opts.Verbose = verbose // so we can use the info and warn logging levels
 
 	// using context to coordinate closing things
 	ret.ctx, ret.ctxCancel = context.WithCancel(context.Background())
@@ -194,10 +201,6 @@ func NewClient (serverUrl string, port int, reader readCallback) (*Client, error
 	// first step, let's try to connec to our server, if that doesn't work then we're done pretty quick
 	err := ret.connect()
 	if err != nil { return nil, err }
-	
-	ret.messages = make (chan *models.QueMessage, 100) // this should be happening real quick, but there is a concern if the server is unreachable
-
-	ret.wgMessages = new(sync.WaitGroup)
 	
 	go ret.monitorMessages() // monitor this channel as well
 	go ret.read() // fire off the reader

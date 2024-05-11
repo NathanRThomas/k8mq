@@ -8,10 +8,10 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/justinas/alice v1.2.0
 	github.com/pkg/errors v0.9.1
-	nhooyr.io/websocket v1.8.10
+	nhooyr.io/websocket v1.8.11
 )
 
 require (
-	golang.org/x/net v0.18.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 )
