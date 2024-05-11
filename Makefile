@@ -11,7 +11,7 @@ build: build-client
 
 build-server:
 	@echo "building k8mq server"
-	@$(GOBUILD) -o $(GOPATH)/k8mq-server ./server/main/
+	@$(GOBUILD) -o $(GOPATH)/k8mq-server ./server/cmd/
 
 build-client:
 	@echo "building k8mq client"

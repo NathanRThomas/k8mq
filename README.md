@@ -2,23 +2,18 @@
 Message que designed for for Kubernetes deployments
 
 ***
-### Example
-```
-func clientReadCallback (b []byte) {
-	log.Printf("clientReadCallback: %s", string(b))
-}
 
+### All pods the same
+If all the pods are the same, and you just need them to broadcast messages to eachother.
+You can run a simple service like the one in server/cmd.
+This creates a service that runs on port 8080, by default, with an additional
+websocket service running on port 8088.
 
-func TestClient1 (t *testing.T) {
-
-	client, err := NewClient ("localhost", 8080, clientReadCallback)
-	if err != nil { t.Fatal(err) }
-
-	client.NewMsg([]byte("Hello World"))
-
-	time.Sleep(time.Second * 3)
-
-	err = client.Close(time.Second)
-	if err != nil { t.Fatal(err) }
-}
-```
+### Special Pod
+If you have 1 pod that's special, handles thread safe things, and you *always* 
+need that pod to be running for things to work.
+Then you can just import the server like cmd/server does.
+You can also pass the NewServer function a reader function.
+This changes the behavior so instead of re-broadcasting all messages to
+all connected services.
+All incoming messages only get read into that function.

@@ -67,8 +67,5 @@ func (this *app) routes () *mux.Router {
 	mux.Handle("/status/live", liveCheck.ThenFunc(this.thingsLookGood)).Methods(http.MethodGet, http.MethodOptions)
 
 	mux.Handle("/status/ready", liveCheck.Append(this.readyCheck).ThenFunc(this.thingsLookGood)).Methods(http.MethodGet, http.MethodOptions)
-
-	// queue - websockets
-	mux.Handle ("/que", alice.New().ThenFunc(this.wssHandle))
-    return mux
+	return mux
 }

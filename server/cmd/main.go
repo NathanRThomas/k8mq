@@ -1,15 +1,13 @@
 /** ****************************************************************************************************************** **
-	Main file for the server side of K8MQ
-	A message que system designed for use within a kubernetes system.
-	This server service should run as a single pod deployment, with a maxSurge of 0, 
-	so it completely "goes away" before the clients re-connect to it.
+	Creates a service, mostly as an example, that listens for connections and broadcasts messages to all listeners
 	
 ** ****************************************************************************************************************** **/
 
 package main
 
 import (
-	"github.com/NathanRThomas/k8mq/server/models"
+	"github.com/NathanRThomas/k8mq/models"
+	"github.com/NathanRThomas/k8mq/server"
 
 	"github.com/jessevdk/go-flags"
 	
@@ -35,6 +33,7 @@ const serviceName = "K8MQ Server"
 // final local options object for this executable
 var opts struct {
 	models.OPTS
+	WSSPort int `long:"wssport" description:"Port you want to run the websocket service on on" default:"8088"`
 }
   //-------------------------------------------------------------------------------------------------------------------//
  //----- PRIVATE FUNCTIONS -------------------------------------------------------------------------------------------//
@@ -84,7 +83,7 @@ type app struct {
 	models.Stack
 	running bool 
 
-	que *models.Que 
+	server *server.Server
 }
 
 // init function for the app 
@@ -92,13 +91,14 @@ func (this *app) init() (models.Callback, error) {
 	// default logger for formatted error messages
 	this.ErrorLog = log.New (os.Stderr, "ERROR\t", log.LstdFlags | log.Lmicroseconds | log.Llongfile | log.LUTC)
 
-	this.que = models.NewQue(&opts.OPTS)
-	
+	var err error
+	this.server, err = server.NewServer (opts.WSSPort, nil, opts.Verbose)
+
 	return func() error {
 		// close these in order
-		return this.que.Close(time.Second * 20)
+		return this.server.Close(time.Second * 20)
 
-	}, nil // return any error from above
+	}, err // return any error from above
 }
 
 // monitors for a kill sigterm to set the running = false

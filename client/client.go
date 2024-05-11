@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"nhooyr.io/websocket"
 
-	"github.com/NathanRThomas/k8mq/server/models"
+	"github.com/NathanRThomas/k8mq/models"
 	
 	"fmt"
 	"context"
@@ -26,7 +26,7 @@ import (
  //----- CONSTS ----------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------------//
 
-type readCallback = func([]byte)
+
 
   //-----------------------------------------------------------------------------------------------------------------------//
  //----- STRUCTS ---------------------------------------------------------------------------------------------------------//
@@ -37,7 +37,7 @@ type Client struct {
 	opts models.OPTS // used for logging
 	serverUrl string 
 	port int 
-	reader readCallback
+	reader models.ReadCallback
 	ctx context.Context 
 	ctxCancel context.CancelFunc
 	conn *websocket.Conn 	// The websocket connection.
@@ -185,9 +185,9 @@ func (this *Client) NewMsg (msg []byte) {
 //-----------------------------------------------------------------------------------------------------------------------//
 
 // creates a new client object to connect, send and receive messages from our server
-func NewClient (serverUrl string, port int, reader readCallback, verbose []bool) (*Client, error) {
+func NewClient (serverUrl string, port int, reader models.ReadCallback, verbose []bool) (*Client, error) {
 	if len(serverUrl) == 0 { return nil, errors.Errorf("remote K8MQ server url required, eg 'k8mq.default.svc'")}
-	if port == 0 { port = 8080 } // default port
+	if port == 0 { port = models.DefaultPort } // default port
 
 	ret := &Client{
 		serverUrl: serverUrl,

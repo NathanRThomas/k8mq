@@ -4,11 +4,10 @@
 	Trackes the list of them in an internal memory que
 ** ****************************************************************************************************************** **/
 
-package main 
+package server 
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 	
 	"net/http"
 	"strings"
@@ -20,7 +19,7 @@ import (
 //-------------------------------------------------------------------------------------------------------------------------//
 
 // handles a wss error and records it if it's "bad"
-func (this *app) wssErr (err error) {
+func (this *Server) wssErr (err error) {
 	if strings.Contains(err.Error(), "websocket: close 1000") {
 		return // we're cool with this one, normal close status
 	}
@@ -38,11 +37,11 @@ func (this *app) wssErr (err error) {
 	}
 
 	// this is probably bad, so record it
-	this.StackTrace(errors.WithStack(err))
+	this.opts.Warn("k8mq wss error %v", err)
 }
 
 // websocket entry point
-func (this *app) wssHandle (w http.ResponseWriter, r *http.Request) {
+func (this *Server) wssHandle (w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context() // pass to the connect to test context to see if it's bad?
 	var upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -52,7 +51,7 @@ func (this *app) wssHandle (w http.ResponseWriter, r *http.Request) {
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		this.StackTrace(err)
+		this.opts.Warn("k8mq wss upgrade error %v", err)
 		return
 	}
 	
@@ -69,10 +68,14 @@ func (this *app) wssHandle (w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		
-		opts.Info("received message : %d : %s", mType, string(msg))
+		this.opts.Info("received message : %d : %s", mType, string(msg))
 
 		if mType != 1 { continue } // only passing along 1 types right now, utf8
 
-		this.que.NewMsg (msg) // repeat this to everyone
+		if this.reader != nil {
+			this.reader (msg) // we have a specific reader, so do use that instead
+		} else {
+			this.que.NewMsg (msg) // repeat this to everyone
+		}
 	}
 }
