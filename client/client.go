@@ -83,6 +83,8 @@ func (this *Client) monitorMessages () {
 			this.messages <- msg
 		}
 	}
+
+	this.opts.Info("QUE: Monitor exited")
 }
 
 func (this *Client) read () {
@@ -91,7 +93,9 @@ func (this *Client) read () {
 		if err == nil {
 			if mType == websocket.MessageText && this.reader != nil {
 				this.opts.Info("QUE: Found message to read : %s", string(data))
-				this.reader(data)
+				if this.reader != nil { // in theory there may be a use where something only writes and never reads
+					this.reader(data)
+				}
 			}
 		} else if this.ctx.Err() == nil {
 			this.opts.Warn("QUE: Read error : %v : reconnecting\n", err)
@@ -101,7 +105,7 @@ func (this *Client) read () {
 		}
 	}
 
-	fmt.Println("exit read")
+	this.opts.Info("QUE: Read exited")
 }
 
 // handles connecting to the remote server
