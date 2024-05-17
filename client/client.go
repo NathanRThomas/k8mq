@@ -57,11 +57,13 @@ func (this *Client) monitorMessages () {
 	for msg := range this.messages {
 		if msg == nil { break } // channel is closed
 
+		if this.ctx.Err() != nil { break } // we're shutting down
+
 		// write this out to our server
 		// i'm pretty sure we'll be handling errors and reconnecting from the reading thread,
 		// so as long as the conn isn't nil, assume this works
 		ok := false 
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 4; i++ {
 			if this.conn != nil {
 				err := this.conn.Write(this.ctx, websocket.MessageText, msg.Msg)
 				if err == nil {
@@ -87,8 +89,16 @@ func (this *Client) monitorMessages () {
 	this.opts.Info("QUE: Monitor exited")
 }
 
+// handles monitoring the read channel as well as re-connecting to the main service when the connection is invalid
 func (this *Client) read () {
 	for {
+		if this.conn == nil {
+			this.opts.Warn("QUE: no connection to primary service : reconnecting")
+			this.connect()
+			continue 
+		}
+
+		// now that we have a connection that isn't nil 
 		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
 			if mType == websocket.MessageText && this.reader != nil {
@@ -98,7 +108,7 @@ func (this *Client) read () {
 				}
 			}
 		} else if this.ctx.Err() == nil {
-			this.opts.Warn("QUE: Read error : %v : reconnecting\n", err)
+			this.opts.Warn("QUE: Read error : %v : reconnecting", err)
 			this.connect()
 		} else {
 			break // we're done
@@ -109,11 +119,11 @@ func (this *Client) read () {
 }
 
 // handles connecting to the remote server
-func (this *Client) connect () error {
-	var outErr error 
+func (this *Client) connect () {
+	
 	// try this with a timeout
-	for i := 0; i < 5; i++ {
-		if this.ctx.Err() != nil { return errors.WithStack(this.ctx.Err()) } // bail, we're closing
+	for i := 0; i < 4; i++ {
+		if this.ctx.Err() != nil { return } // bail, we're closing
 
 		ctx, cancel := context.WithTimeout(this.ctx, time.Second * 3)
 		defer cancel()
@@ -121,14 +131,15 @@ func (this *Client) connect () error {
 		conn, _, err := websocket.Dial (ctx, fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), nil)
 		if err == nil {
 			this.conn = conn // we're good, copy this over
-			return nil 
+			this.opts.Info("QUE: connected to %s:%d", this.serverUrl, this.port)
+			return
 		}
-		outErr = err // use this for the return
+		
 		time.Sleep(time.Second * time.Duration(int(math.Pow(2, float64(i))))) // sleep with a exp backoff
 	}
 
 	// this is bad, couldn't connect to the server
-	return errors.Wrap(outErr, "Remote K8MQ server did not respond")
+	this.opts.Warn("QUE: failed to connect to %s:%d", this.serverUrl, this.port)
 }
 
 // closes things and waits in its own thread
@@ -202,10 +213,6 @@ func NewClient (serverUrl string, port int, reader models.ReadCallback, verbose 
 	// using context to coordinate closing things
 	ret.ctx, ret.ctxCancel = context.WithCancel(context.Background())
 
-	// first step, let's try to connec to our server, if that doesn't work then we're done pretty quick
-	err := ret.connect()
-	if err != nil { return nil, err }
-	
 	go ret.monitorMessages() // monitor this channel as well
 	go ret.read() // fire off the reader
 

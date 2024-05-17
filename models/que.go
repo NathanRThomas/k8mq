@@ -78,7 +78,7 @@ func (this *Que) monitorMessages () {
 
 				} else {
 					// going to record these for now
-					this.opts.Warn("client write failed, removing from que list")
+					this.opts.Info("client write failed, removing from que list")
 				}
 			} // else the context is gone, so don't include it anymore
 		}
