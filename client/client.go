@@ -172,8 +172,9 @@ func (this *Client) Close (tm time.Duration) error {
 	case <- done:
 		// we finished normally and expectidly 
 		this.ctxCancel() // shut it down
-		this.conn.Close(websocket.StatusNormalClosure, "")
-		
+		if this.conn != nil {
+			this.conn.Close(websocket.StatusNormalClosure, "")
+		}
 
 	case <-ctx.Done():
 		// this is bad, means the context timed out before things finished
