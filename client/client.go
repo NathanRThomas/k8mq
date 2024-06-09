@@ -104,11 +104,9 @@ func (this *Client) read () {
 		// now that we have a connection that isn't nil 
 		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
-			this.opts.Info("RAW QUE: Found message to read : %s", string(data))
+			this.opts.Info("RAW QUE: Found message to read : %v : %s", mType, string(data))
 
-			if mType == websocket.MessageText && this.reader != nil {
-				this.opts.Info("QUE: Found message to read : %s", string(data))
-
+			if mType == websocket.MessageText {
 				// first see if we have an idHash with a receiver channel
 				mHash := &models.MessageHashPrototype{}
 				err = json.Unmarshal(data, mHash)
