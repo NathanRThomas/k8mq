@@ -104,6 +104,8 @@ func (this *Client) read () {
 		// now that we have a connection that isn't nil 
 		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
+			this.opts.Info("RAW QUE: Found message to read : %s", string(data))
+
 			if mType == websocket.MessageText && this.reader != nil {
 				this.opts.Info("QUE: Found message to read : %s", string(data))
 
