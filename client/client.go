@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 	"math"
+	"encoding/json"
 )
 
   //-----------------------------------------------------------------------------------------------------------------------//
@@ -44,6 +45,8 @@ type Client struct {
 
 	wgMessages *sync.WaitGroup
 	messages chan *models.QueMessage
+	hashListeners map[string](chan *models.QueMessage)
+	hashLocker sync.RWMutex 
 }
 
 
@@ -103,6 +106,25 @@ func (this *Client) read () {
 		if err == nil {
 			if mType == websocket.MessageText && this.reader != nil {
 				this.opts.Info("QUE: Found message to read : %s", string(data))
+
+				// first see if we have an idHash with a receiver channel
+				mHash := &models.MessageHashPrototype{}
+				err = json.Unmarshal(data, mHash)
+				if err == nil && len(mHash.IdHash) > 0 {
+					// we got an id hash, let's see if we registered a listening channel
+					this.hashLocker.Lock()
+
+					if ch, ok := this.hashListeners[mHash.IdHash]; ok {
+						ch <- &models.QueMessage{ Msg: data }
+						close(ch) // now close this channel, we don't need it anymore
+						delete(this.hashListeners, mHash.IdHash) // remove it from our map as well
+						this.hashLocker.Unlock() // unlock the hash locker
+						continue // don't do the regular reader
+					}
+
+					this.hashLocker.Unlock() // unlock the hash locker
+				}
+
 				if this.reader != nil { // in theory there may be a use where something only writes and never reads
 					this.reader(data)
 				}
@@ -192,6 +214,15 @@ func (this *Client) NewMsg (msg []byte) {
 	}
 }
 
+// registers a one-time channel to pass the data to anytime the id hash matches
+func (this *Client) RegisterOneTime (idHash string, ch chan *models.QueMessage) {
+	if len(idHash) == 0 { return } // bail
+
+	this.hashLocker.RLock() // lock it for reading
+	this.hashListeners[idHash] = ch // set this locally
+	this.hashLocker.RUnlock() // unlock it, we're done
+}
+
   //-----------------------------------------------------------------------------------------------------------------------//
  //----- PUBLIC FUNCTIONS ------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------------//
@@ -210,6 +241,8 @@ func NewClient (serverUrl string, port int, reader models.ReadCallback, verbose 
 	}
 
 	ret.opts.Verbose = verbose // so we can use the info and warn logging levels
+
+	ret.hashListeners = make(map[string](chan *models.QueMessage))
 
 	// using context to coordinate closing things
 	ret.ctx, ret.ctxCancel = context.WithCancel(context.Background())
