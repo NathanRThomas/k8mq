@@ -85,7 +85,7 @@ func (this *Client) monitorMessages () {
 		// not sure what to do, can't get into a thread lock by trying to write back to the channel
 		// also we're clearly not connecting to the k8mq server
 		// so just log it and move on
-		if ok == false {
+		if ok == false && this.ctx.Err() == nil { // only reque if we're not exiting
 			this.opts.Warn("QUE: Failed to write to the k8mq server : re-quing : %s", string(msg.Msg))
 			this.messages <- msg
 		}
