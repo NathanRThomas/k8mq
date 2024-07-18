@@ -78,6 +78,8 @@ func (this *Client) monitorMessages () {
 			// if we're here, it's cause we couldn't send things, so try again
 			this.opts.Warn("QUE: Unable to write message, sleeping")
 			time.Sleep(time.Second * time.Duration(int(math.Pow(2, float64(i))))) // sleep with a exp backoff
+
+			if this.ctx.Err() != nil { break } // we're shutting down
 		}
 
 		// not sure what to do, can't get into a thread lock by trying to write back to the channel
