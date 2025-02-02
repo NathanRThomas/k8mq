@@ -8,9 +8,11 @@ package server
 
 import (
 	"github.com/gorilla/websocket"
-	
+
+	"fmt"
 	"net/http"
 	"strings"
+	"log/slog"
 )
 
 
@@ -37,7 +39,7 @@ func (this *Server) wssErr (err error) {
 	}
 
 	// this is probably bad, so record it
-	this.opts.Warn("k8mq wss error %v", err)
+	slog.Warn("k8mq wss error :" + err.Error())
 }
 
 // websocket entry point
@@ -51,7 +53,7 @@ func (this *Server) wssHandle (w http.ResponseWriter, r *http.Request) {
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		this.opts.Warn("k8mq wss upgrade error %v", err)
+		slog.Warn("k8mq wss upgrade error :" + err.Error())
 		return
 	}
 	
@@ -68,7 +70,7 @@ func (this *Server) wssHandle (w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		
-		this.opts.Info("received message : %d : %s", mType, string(msg))
+		slog.Info(fmt.Sprintf("received message : %d : %s", mType, string(msg)))
 
 		if mType != 1 { continue } // only passing along 1 types right now, utf8
 

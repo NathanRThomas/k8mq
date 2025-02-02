@@ -1,16 +1,17 @@
 /** ****************************************************************************************************************** **
-	Stack tracing errors. pulled this out of main for fun
+	Specifically for logging errors
 	
 ** ****************************************************************************************************************** **/
 
-package models
+package models 
 
 import (
 	"github.com/pkg/errors"
 	
 	"fmt"
+	"os"
 	"context"
-	"log"
+	"log/slog"
 	"testing"
 )
 
@@ -18,47 +19,46 @@ import (
  //----- CONSTS ----------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------------//
 
+  //-----------------------------------------------------------------------------------------------------------------------//
+ //----- STRUCTS ---------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------//
+
+
 //----- Error Handling -----------------------------------------------------------------------------------------------//
 type stackTracer interface {
 	StackTrace() errors.StackTrace
 }
 
-  //-----------------------------------------------------------------------------------------------------------------------//
- //----- STACK -----------------------------------------------------------------------------------------------------------//
-//-----------------------------------------------------------------------------------------------------------------------//
-
-type Stack struct {
-	ErrorLog *log.Logger
+type Logger struct {
 }
 
-func (this *Stack) StackTrace (err error) {
-	if err == nil { return }
-	if this.ErrorLog != nil {
-		this.ErrorLog.Println (err)
-	} else {
-		log.Println (err)
-	}
+func (this *Logger) Init () {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions { Level: slog.LevelDebug }))
+	slog.SetDefault(logger) // so we just directly slog from somewhere without this original logger
+}
 
-	for _, ln := range StackTraceToArray (err) {
-		fmt.Println (ln) // print out each line
-	}
+
+func (this *Logger) StackTrace (err error) {
+	if err == nil { return }
+	slog.Error (err.Error())
+
+	slog.Debug("Stacktrace", slog.Any("stacktrace", StackTraceToArray (err)))
 }
 
 // simple wrapper when we want to create a new error and stack trace in the same call
-func (this *Stack) TraceErr (msg string, params ...interface{}) {
+func (this *Logger) TraceErr (msg string, params ...interface{}) {
 	this.StackTrace (errors.Errorf(msg, params...))
 }
 
 // Checks the context and records an error with the stack if it's bad/expired
-func (this *Stack) CtxOk (ctx context.Context) bool {
+func (this *Logger) CtxOk (ctx context.Context) bool {
 	this.StackTrace (errors.WithStack (ctx.Err())) // record any error with a stack
 	return ctx.Err() == nil // return if we're ok
 }
 
   //-----------------------------------------------------------------------------------------------------------------------//
- //----- PUBLIC FUNCTIONS ------------------------------------------------------------------------------------------------//
+ //----- FUNCTIONS -------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------------//
-
 
 // converts an error into an array of strings that contain the stack lines and files
 func StackTraceToArray (err error) (ret []string) {
@@ -71,6 +71,7 @@ func StackTraceToArray (err error) (ret []string) {
 	}
 	return 
 }
+
 
 // used during testing so we can see where the unexpected error is coming from 
 func TestingStackTrace (t *testing.T, err error) {

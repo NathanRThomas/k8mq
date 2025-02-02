@@ -21,6 +21,7 @@ import (
 	"time"
 	"math"
 	"encoding/json"
+	"log/slog"
 )
 
   //-----------------------------------------------------------------------------------------------------------------------//
@@ -35,7 +36,6 @@ import (
 
 // main object
 type Client struct {
-	opts models.OPTS // used for logging
 	serverUrl string 
 	port int 
 	reader models.ReadCallback
@@ -76,7 +76,7 @@ func (this *Client) monitorMessages () {
 			}
 
 			// if we're here, it's cause we couldn't send things, so try again
-			this.opts.Warn("QUE: Unable to write message, sleeping")
+			slog.Warn("QUE: Unable to write message, sleeping")
 			time.Sleep(time.Second * time.Duration(int(math.Pow(2, float64(i))))) // sleep with a exp backoff
 
 			if this.ctx.Err() != nil { break } // we're shutting down
@@ -86,19 +86,19 @@ func (this *Client) monitorMessages () {
 		// also we're clearly not connecting to the k8mq server
 		// so just log it and move on
 		if ok == false && this.ctx.Err() == nil { // only reque if we're not exiting
-			this.opts.Warn("QUE: Failed to write to the k8mq server : re-quing : %s", string(msg.Msg))
+			slog.Warn("QUE: Failed to write to the k8mq server : re-quing : " + string(msg.Msg))
 			this.messages <- msg
 		}
 	}
 
-	this.opts.Info("QUE: Monitor exited")
+	slog.Info("QUE: Monitor exited")
 }
 
 // handles monitoring the read channel as well as re-connecting to the main service when the connection is invalid
 func (this *Client) read () {
 	for {
 		if this.conn == nil {
-			this.opts.Warn("QUE: no connection to primary service : reconnecting")
+			slog.Warn("QUE: no connection to primary service : reconnecting")
 			this.connect()
 			continue 
 		}
@@ -106,7 +106,7 @@ func (this *Client) read () {
 		// now that we have a connection that isn't nil 
 		mType, data, err := this.conn.Read(this.ctx)
 		if err == nil {
-			this.opts.Info("RAW QUE: Found message to read : %v : %s", mType, string(data))
+			slog.Info(fmt.Sprintf("RAW QUE: Found message to read : %v : %s", mType, string(data)))
 
 			if mType == websocket.MessageText {
 				// first see if we have an idHash with a receiver channel
@@ -132,14 +132,14 @@ func (this *Client) read () {
 				}
 			}
 		} else if this.ctx.Err() == nil {
-			this.opts.Warn("QUE: Read error : %v : reconnecting", err)
+			slog.Warn(fmt.Sprintf("QUE: Read error : %v : reconnecting", err))
 			this.connect()
 		} else {
 			break // we're done
 		}
 	}
 
-	this.opts.Info("QUE: Read exited")
+	slog.Info("QUE: Read exited")
 }
 
 // handles connecting to the remote server
@@ -155,7 +155,7 @@ func (this *Client) connect () {
 		conn, _, err := websocket.Dial (ctx, fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), nil)
 		if err == nil {
 			this.conn = conn // we're good, copy this over
-			this.opts.Info("QUE: connected to %s:%d", this.serverUrl, this.port)
+			slog.Info(fmt.Sprintf("QUE: connected to %s:%d", this.serverUrl, this.port))
 			return
 		}
 		
@@ -163,7 +163,7 @@ func (this *Client) connect () {
 	}
 
 	// this is bad, couldn't connect to the server
-	this.opts.Warn("QUE: failed to connect to %s:%d", this.serverUrl, this.port)
+	slog.Warn(fmt.Sprintf("QUE: failed to connect to %s:%d", this.serverUrl, this.port))
 }
 
 // closes things and waits in its own thread
@@ -230,7 +230,7 @@ func (this *Client) RegisterOneTime (idHash string, ch chan *models.QueMessage) 
 //-----------------------------------------------------------------------------------------------------------------------//
 
 // creates a new client object to connect, send and receive messages from our server
-func NewClient (serverUrl string, port int, reader models.ReadCallback, verbose []bool) (*Client, error) {
+func NewClient (serverUrl string, port int, reader models.ReadCallback) (*Client, error) {
 	if len(serverUrl) == 0 { return nil, errors.Errorf("remote K8MQ server url required, eg 'k8mq.default.svc'")}
 	if port == 0 { port = models.DefaultPort } // default port
 
@@ -241,8 +241,6 @@ func NewClient (serverUrl string, port int, reader models.ReadCallback, verbose 
 		messages: make (chan *models.QueMessage, 100), // this should be happening real quick, but there is a concern if the server is unreachable
 		wgMessages: new(sync.WaitGroup),
 	}
-
-	ret.opts.Verbose = verbose // so we can use the info and warn logging levels
 
 	ret.hashListeners = make(map[string](chan *models.QueMessage))
 

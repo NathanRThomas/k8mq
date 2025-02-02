@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"os/signal"
@@ -27,7 +28,7 @@ import (
  //----- CONSTS ------------------------------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------------------------------------------//
 
-const serviceVersion = "0.1.0"
+const serviceVersion = "0.2.0"
 const serviceName = "K8MQ Server"
 
 // final local options object for this executable
@@ -80,7 +81,7 @@ func parseCommandLineArgs() []string {
 //-----------------------------------------------------------------------------------------------------------------------//
 
 type app struct {
-	models.Stack
+	models.Logger
 	running bool 
 
 	server *server.Server
@@ -89,10 +90,10 @@ type app struct {
 // init function for the app 
 func (this *app) init() (models.Callback, error) {
 	// default logger for formatted error messages
-	this.ErrorLog = log.New (os.Stderr, "ERROR\t", log.LstdFlags | log.Lmicroseconds | log.Llongfile | log.LUTC)
-
+	this.Logger.Init()
+	
 	var err error
-	this.server, err = server.NewServer (opts.WSSPort, nil, opts.Verbose)
+	this.server, err = server.NewServer (opts.WSSPort, nil)
 
 	return func() error {
 		// close these in order
@@ -120,7 +121,6 @@ func (this *app) monitorForKill(fn func()) {
 func (this *app) createServer (port int, wg *sync.WaitGroup, handler http.Handler) *http.Server {
 	svr := &http.Server {
 		Addr: fmt.Sprintf(":%d", port),
-		ErrorLog: this.ErrorLog,
 		Handler: handler, 
 		ReadTimeout: time.Second * 30,
 	}
@@ -147,7 +147,7 @@ func main() {
 	// first step, parse the command line params
 	args := parseCommandLineArgs()
 
-	opts.Info("Starting %s v%s", serviceName, serviceVersion)
+	slog.Info("Starting " + serviceName + " v" + serviceVersion)
 
 	// early check for flags
 	for _, arg := range args {
@@ -170,17 +170,17 @@ func main() {
 	for _, arg := range args {
 		switch strings.ToLower(arg) {
 		case "todo":
-			fmt.Println("TODO")
+			// fmt.Println("TODO")
 
 			err = finalDefer()
 			if err != nil {
-				app.ErrorLog.Printf("Final Defer Error\n%v\n", err)
+				slog.Error("Final Defer Error: " + err.Error())
 			} // record our defered error
 			os.Exit(0)
 
 		default:
 			finalDefer()
-			log.Printf("Unknown command line argument '%s'\nCheckout our help for more info\n", arg)
+			slog.Error("Unknown command line argument '" + arg + "'\nCheckout our help for more info")
 			os.Exit(1)
 		}
 	}
@@ -192,12 +192,12 @@ func main() {
 
 	app.running = true // this app is now officially running
 
-	log.Printf("%s v%s started on port %d\n", serviceName, serviceVersion, opts.Port) // going to always record this starting message
-	if err := srv.ListenAndServe(); err != http.ErrServerClosed {            // Error starting or closing listener:
-		log.Printf("Error %s ListenAndServe: %v", serviceName, err) // we want to know if this failed for another reason
+	slog.Info(fmt.Sprintf("%s v%s started on port %d\n", serviceName, serviceVersion, opts.Port)) // going to always record this starting message
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed && err != nil {            // Error starting or closing listener:
+		slog.Warn(fmt.Sprintf("Error %s ListenAndServe: %v", serviceName, err)) // we want to know if this failed for another reason
 	}
 
-	opts.Info("exiting")
+	slog.Info("exiting")
 
 	app.StackTrace(finalDefer())
 	

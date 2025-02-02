@@ -12,6 +12,8 @@ import (
 	"context"
 	"sync"
 	"time"
+	"fmt"
+	"log/slog"
 )
 
   //-----------------------------------------------------------------------------------------------------------------------//
@@ -53,7 +55,7 @@ func (this *Que) monitorIn () {
 		// add it to our list
 		this.list = append (this.list, conn)
 
-		this.opts.Info ("QUE: connection added: %d", len(this.list))
+		slog.Info (fmt.Sprintf("QUE: connection added: %d", len(this.list)))
 	}
 }
 
@@ -78,13 +80,13 @@ func (this *Que) monitorMessages () {
 
 				} else {
 					// going to record these for now
-					this.opts.Info("client write failed, removing from que list")
+					slog.Info("client write failed, removing from que list")
 				}
 			} // else the context is gone, so don't include it anymore
 		}
 
 		this.list = newList // copy this over
-		this.opts.Info ("QUE: message sent: %d", len(this.list))
+		slog.Info (fmt.Sprintf("QUE: message sent: %d", len(this.list)))
 	}
 }
 
@@ -97,7 +99,7 @@ func (this *Que) closeAndWait (ch chan bool) {
 	this.wg.Wait() // wait for the threads to finish
 	// they fininshed, so set the channel
 	ch <- true 
-	this.opts.Info ("QUE: close and wait")
+	slog.Info ("QUE: close and wait")
 }
 
 //----- PUBLIC -----------------------------------------------------------------------------------------------------//

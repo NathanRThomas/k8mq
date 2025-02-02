@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"log/slog"
 )
 
   //-------------------------------------------------------------------------------------------------------------------//
@@ -71,10 +72,10 @@ func (this *Server) launchServer (port int) {
 		ReadTimeout: time.Second * 30,
 	}
 
-	this.opts.Info("K8MQ Server Started on port %d", port)
+	slog.Info(fmt.Sprintf("K8MQ Server Started on port %d", port))
 
-	if err := this.svr.ListenAndServe(); err != http.ErrServerClosed {            // Error starting or closing listener:
-		this.opts.Warn("K8MQ Server closed with an error : %v", err)
+	if err := this.svr.ListenAndServe(); err != http.ErrServerClosed && err != nil {            // Error starting or closing listener:
+		slog.Warn("K8MQ Server closed with an error : " + err.Error())
 	}
 	
 	this.wg.Done() // we're done, the server isn't running anymore
@@ -111,15 +112,13 @@ func (this *Server) NewMsg (msg []byte) {
 }
 
 // setting a reader changes the behavior so instead of re-broadcasting each message it returns each message to the reader instead
-func NewServer (port int, reader models.ReadCallback, verbose []bool) (*Server, error) {
+func NewServer (port int, reader models.ReadCallback) (*Server, error) {
 	if port == 0 { port = models.DefaultPort } // default port
 
 	ret := &Server{
 		wg: new(sync.WaitGroup),
 		reader: reader, // could be null
 	}
-
-	ret.opts.Verbose = verbose // so we can use the info and warn logging levels
 
 	ret.que = models.NewQue(&ret.opts)
 
