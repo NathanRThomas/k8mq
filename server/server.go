@@ -52,11 +52,17 @@ type Server struct {
 
 // actually handles the closing of things in a background process
 func (this *Server) closeAndWait (ctx context.Context, done chan bool) {
-	this.svr.Shutdown(ctx)
+	if this.svr != nil {
+		this.svr.Shutdown(ctx)
+	}
 
-	this.que.Close(time.Second * 20)
+	if this.que != nil {
+		this.que.Close(time.Second * 20)
+	}
 
-	this.wg.Wait() // wait for the server to shut down
+	if this.wg != nil {
+		this.wg.Wait() // wait for the server to shut down
+	}
 
 	done <- true // we're done
 }
