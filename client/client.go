@@ -89,7 +89,7 @@ func (this *Client) monitorMessages () {
 		if ok == false && this.ctx.Err() == nil { // only reque if we're not exiting
 			if msg.Reques >= 1 {
 				slog.Error("QUE: Failed to write to the k8mq server: " + string(msg.Msg))
-				
+
 			} else if this.shuttingDown == false {
 				// only reque if we're not shutting down
 				slog.Warn("QUE: Failed to write to the k8mq server : re-quing : " + string(msg.Msg))
@@ -104,7 +104,7 @@ func (this *Client) monitorMessages () {
 
 // handles monitoring the read channel as well as re-connecting to the main service when the connection is invalid
 func (this *Client) read () {
-	for {
+	for this.ctx.Err() == nil {
 		if this.conn == nil {
 			slog.Warn("QUE: no connection to primary service : reconnecting")
 			this.connect()
@@ -139,11 +139,9 @@ func (this *Client) read () {
 					this.reader(data)
 				}
 			}
-		} else if this.ctx.Err() == nil {
+		} else {
 			slog.Warn(fmt.Sprintf("QUE: Read error : %v : reconnecting", err))
 			this.connect()
-		} else {
-			break // we're done
 		}
 	}
 
@@ -154,21 +152,17 @@ func (this *Client) read () {
 func (this *Client) connect () {
 	
 	// try this with a timeout
-	for i := 0; i < 4; i++ {
-		if this.ctx.Err() != nil { return } // bail, we're closing
+	ctx, cancel := context.WithTimeout(this.ctx, time.Second * 3)
+	defer cancel()
 
-		ctx, cancel := context.WithTimeout(this.ctx, time.Second * 3)
-		defer cancel()
-
-		conn, _, err := websocket.Dial (ctx, fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), nil)
-		if err == nil {
-			this.conn = conn // we're good, copy this over
-			slog.Info(fmt.Sprintf("QUE: connected to %s:%d", this.serverUrl, this.port))
-			return
-		}
-		
-		time.Sleep(time.Second * time.Duration(int(math.Pow(2, float64(i))))) // sleep with a exp backoff
+	conn, _, err := websocket.Dial (ctx, fmt.Sprintf("ws://%s:%d/que", this.serverUrl, this.port), nil)
+	if err == nil {
+		this.conn = conn // we're good, copy this over
+		slog.Info(fmt.Sprintf("QUE: connected to %s:%d", this.serverUrl, this.port))
+		return
 	}
+	
+	time.Sleep(time.Second) // sleep a little
 
 	// this is bad, couldn't connect to the server
 	slog.Warn(fmt.Sprintf("QUE: failed to connect to %s:%d", this.serverUrl, this.port))
