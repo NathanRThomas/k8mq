@@ -140,6 +140,7 @@ func (this *Client) read () {
 				}
 			}
 		} else {
+			this.conn = nil // this connection is no longer valid
 			slog.Warn(fmt.Sprintf("QUE: Read error : %v : reconnecting", err))
 			this.connect()
 		}
