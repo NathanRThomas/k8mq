@@ -47,6 +47,7 @@ type Client struct {
 	messages chan *models.QueMessage
 	hashListeners map[string](chan *models.QueMessage)
 	hashLocker sync.RWMutex 
+	shuttingDown bool // indicates that we're shutting down
 }
 
 
@@ -86,8 +87,15 @@ func (this *Client) monitorMessages () {
 		// also we're clearly not connecting to the k8mq server
 		// so just log it and move on
 		if ok == false && this.ctx.Err() == nil { // only reque if we're not exiting
-			slog.Warn("QUE: Failed to write to the k8mq server : re-quing : " + string(msg.Msg))
-			this.messages <- msg
+			if msg.Reques >= 1 {
+				slog.Error("QUE: Failed to write to the k8mq server: " + string(msg.Msg))
+				
+			} else if this.shuttingDown == false {
+				// only reque if we're not shutting down
+				slog.Warn("QUE: Failed to write to the k8mq server : re-quing : " + string(msg.Msg))
+				msg.Reques++ // ramp this for next time
+				this.messages <- msg
+			}
 		}
 	}
 
@@ -168,6 +176,8 @@ func (this *Client) connect () {
 
 // closes things and waits in its own thread
 func (this *Client) closeAndWait (ch chan bool) {
+	this.shuttingDown = true // flag this
+
 	// close all the channels
 	if this.messages != nil {
 		close(this.messages)

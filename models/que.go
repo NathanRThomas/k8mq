@@ -31,6 +31,7 @@ type queConn struct {
 
 type QueMessage struct {
 	Msg []byte 
+	Reques int // times this message has been re-queed
 }
 
 type Que struct {

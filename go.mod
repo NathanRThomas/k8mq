@@ -1,6 +1,8 @@
 module github.com/NathanRThomas/k8mq
 
-go 1.21
+go 1.23.0
+
+toolchain go1.23.4
 
 require (
 	github.com/gorilla/mux v1.8.1
@@ -11,4 +13,4 @@ require (
 	nhooyr.io/websocket v1.8.17
 )
 
-require golang.org/x/sys v0.30.0 // indirect
+require golang.org/x/sys v0.32.0 // indirect
