@@ -53,6 +53,8 @@ type Server struct {
 // actually handles the closing of things in a background process
 func (this *Server) closeAndWait (ctx context.Context, done chan bool) {
 	if this.svr != nil {
+		// this shutsdown the server and returns once there's no more active connections.
+		// but we should only have k8 connections anyway, so this should be pretty quick
 		this.svr.Shutdown(ctx)
 	}
 
@@ -114,7 +116,15 @@ func (this *Server) Close (tm time.Duration) error {
 
 // in case we want to fire out a new message to all connected listeners
 func (this *Server) NewMsg (msg []byte) {
-	this.que.NewMsg (msg) // repeat this to everyone
+	if this.que != nil {
+		this.que.NewMsg (msg) // repeat this to everyone
+	}
+}
+
+// this should be fired as soon as k8 knows it's shutting down the k8mq service
+func (this *Server) SendShutdown () {
+	this.NewMsg ([]byte(models.ShutdownMessage))
+	time.Sleep(time.Millisecond * 100) // give a little time to clients process this
 }
 
 // setting a reader changes the behavior so instead of re-broadcasting each message it returns each message to the reader instead

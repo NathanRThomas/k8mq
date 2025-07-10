@@ -16,6 +16,7 @@ import (
 //-----------------------------------------------------------------------------------------------------------------------//
 
 const DefaultPort		= 8088
+const ShutdownMessage	= "SHUTTING IT DOWN"
 
 type Callback = func() error // generic callback function that returns an error
 

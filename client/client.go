@@ -48,12 +48,13 @@ type Client struct {
 	hashListeners map[string](chan *models.QueMessage)
 	hashLocker sync.RWMutex 
 	shuttingDown bool // indicates that we're shutting down
+	remoteServerShuttingDown bool // indicates that the other remote server is shutting down and we need to stop sending messages
 }
 
 
 //----- PRIVATE -----------------------------------------------------------------------------------------------------//
 
-// when a message comes in, we want to 
+// this monitors our internal message channel and tries to send those messages to our connected server
 func (this *Client) monitorMessages () {
 	this.wgMessages.Add(1)
 	defer this.wgMessages.Done()
@@ -68,7 +69,7 @@ func (this *Client) monitorMessages () {
 		// so as long as the conn isn't nil, assume this works
 		ok := false 
 		for i := 0; i < 4; i++ {
-			if this.conn != nil {
+			if this.conn != nil && this.remoteServerShuttingDown == false { // while we have a connection and it's not shutting down
 				err := this.conn.Write(this.ctx, websocket.MessageText, msg.Msg)
 				if err == nil {
 					ok = true 
@@ -117,7 +118,15 @@ func (this *Client) read () {
 			slog.Info(fmt.Sprintf("RAW QUE: Found message to read : %v : %s", mType, string(data)))
 
 			if mType == websocket.MessageText {
-				// first see if we have an idHash with a receiver channel
+				// see if our message was a warning that the server is shutting down
+				if string(data) == models.ShutdownMessage {
+					// this was the server sending a shutdown message
+					// this means we don't want to send any more messages on our connection until it's reset
+					this.remoteServerShuttingDown = true
+					continue // on to the next message
+				}
+
+				// see if we have an idHash with a receiver channel
 				mHash := &models.MessageHashPrototype{}
 				err = json.Unmarshal(data, mHash)
 				if err == nil && len(mHash.IdHash) > 0 {
@@ -160,6 +169,7 @@ func (this *Client) connect () {
 	if err == nil {
 		this.conn = conn // we're good, copy this over
 		slog.Info(fmt.Sprintf("QUE: connected to %s:%d", this.serverUrl, this.port))
+		this.remoteServerShuttingDown = false // clear this flag if it was set, we've connected to a new remote server and we haven't heard anything about it shutting down
 		return
 	}
 	
