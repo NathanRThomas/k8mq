@@ -44,6 +44,8 @@ func (this *Server) wssErr (err error) {
 
 // websocket entry point
 func (this *Server) wssHandle (w http.ResponseWriter, r *http.Request) {
+	if this.closing { return } // bail on new connections while we're closing down
+	
 	ctx := r.Context() // pass to the connect to test context to see if it's bad?
 	var upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {

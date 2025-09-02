@@ -43,6 +43,7 @@ type Server struct {
 	opts models.OPTS // used for logging
 	port int 
 	reader models.ReadCallback
+	closing bool // indicates the server is shutting down and shouldn't accept new connections
 	
 	svr *http.Server
 
@@ -73,6 +74,7 @@ func (this *Server) closeAndWait (ctx context.Context, done chan bool) {
 func (this *Server) launchServer (port int) {
 	// launch our server
 	this.wg.Add(1)  // this gets 
+	this.closing = false // we're not shutting down if we're launching
 
 	this.svr = &http.Server {
 		Addr: fmt.Sprintf(":%d", port),
@@ -123,6 +125,7 @@ func (this *Server) NewMsg (msg []byte) {
 
 // this should be fired as soon as k8 knows it's shutting down the k8mq service
 func (this *Server) SendShutdown () {
+	this.closing = true // don't accept new connections
 	this.NewMsg ([]byte(models.ShutdownMessage))
 	time.Sleep(time.Millisecond * 300) // give a little time to clients process this
 }
