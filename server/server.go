@@ -124,7 +124,7 @@ func (this *Server) NewMsg (msg []byte) {
 // this should be fired as soon as k8 knows it's shutting down the k8mq service
 func (this *Server) SendShutdown () {
 	this.NewMsg ([]byte(models.ShutdownMessage))
-	time.Sleep(time.Millisecond * 100) // give a little time to clients process this
+	time.Sleep(time.Millisecond * 300) // give a little time to clients process this
 }
 
 // setting a reader changes the behavior so instead of re-broadcasting each message it returns each message to the reader instead
