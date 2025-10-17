@@ -107,7 +107,7 @@ func (this *Client) monitorMessages () {
 func (this *Client) read () {
 	for this.ctx.Err() == nil {
 		if this.conn == nil {
-			slog.Warn("QUE: no connection to primary service : reconnecting")
+			slog.Info("QUE: no connection to primary service : reconnecting")
 			this.connect()
 			continue 
 		}
@@ -176,7 +176,7 @@ func (this *Client) connect () {
 	time.Sleep(time.Second) // sleep a little
 
 	// this is bad, couldn't connect to the server
-	slog.Warn(fmt.Sprintf("QUE: failed to connect to %s:%d", this.serverUrl, this.port))
+	slog.Info(fmt.Sprintf("QUE: failed to connect to %s:%d", this.serverUrl, this.port))
 }
 
 // closes things and waits in its own thread
