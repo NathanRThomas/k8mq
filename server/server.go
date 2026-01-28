@@ -59,12 +59,21 @@ func (this *Server) closeAndWait (ctx context.Context, done chan bool) {
 		this.svr.Shutdown(ctx)
 	}
 
+	// close websocket connections first to unblock ReadMessage() calls
+	// this causes wssHandle goroutines to exit their for loops
 	if this.que != nil {
-		this.que.Close(time.Second * 20)
+		this.que.CloseConnections()
 	}
 
 	if this.wg != nil {
-		this.wg.Wait() // wait for the server to shut down
+		// wait for launchServer AND all wssHandle goroutines to finish
+		// this ensures any long-running reader callbacks complete before we close channels
+		this.wg.Wait()
+	}
+
+	// NOW it's safe to close the que channels since no wssHandle goroutines are running
+	if this.que != nil {
+		this.que.Close(time.Second * 20)
 	}
 
 	done <- true // we're done

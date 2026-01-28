@@ -103,6 +103,17 @@ func (this *Que) closeAndWait (ch chan bool) {
 	slog.Info ("QUE: close and wait")
 }
 
+// CloseConnections closes all websocket connections to unblock any ReadMessage() calls
+// Call this before waiting for handlers to finish, then call Close() after
+func (this *Que) CloseConnections () {
+	for _, conn := range this.list {
+		if conn.client != nil {
+			conn.client.Close()
+		}
+	}
+	slog.Info (fmt.Sprintf("QUE: closed %d connections", len(this.list)))
+}
+
 //----- PUBLIC -----------------------------------------------------------------------------------------------------//
 
 // defer function to close things down

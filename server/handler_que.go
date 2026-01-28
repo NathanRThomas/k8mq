@@ -59,6 +59,9 @@ func (this *Server) wssHandle (w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// track this websocket handler so shutdown waits for it
+	this.wg.Add(1)
+	defer this.wg.Done()
 	defer c.Close() // close it eventually
 
 	// add this to our flow of users
