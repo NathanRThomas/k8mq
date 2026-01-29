@@ -83,7 +83,9 @@ func (this *Que) monitorMessages () {
 					// going to record these for now
 					slog.Info("client write failed, removing from que list")
 				}
-			} // else the context is gone, so don't include it anymore
+			} else { // the context is gone, so don't include it anymore
+				slog.Info("client write failed bad context", "error", conn.ctx.Err(), "msg", string(msg.Msg))
+			}
 		}
 
 		this.list = newList // copy this over

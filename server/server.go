@@ -53,28 +53,35 @@ type Server struct {
 
 // actually handles the closing of things in a background process
 func (this *Server) closeAndWait (ctx context.Context, done chan bool) {
+	slog.Info("top closeAndWait")
 	if this.svr != nil {
 		// this shutsdown the server and returns once there's no more active connections.
 		// but we should only have k8 connections anyway, so this should be pretty quick
 		this.svr.Shutdown(ctx)
+		slog.Info("svr shutdown")
 	}
 
 	// close websocket connections first to unblock ReadMessage() calls
 	// this causes wssHandle goroutines to exit their for loops
 	if this.que != nil {
 		this.que.CloseConnections()
+		slog.Info("que.CloseConnections")
 	}
 
 	if this.wg != nil {
 		// wait for launchServer AND all wssHandle goroutines to finish
 		// this ensures any long-running reader callbacks complete before we close channels
 		this.wg.Wait()
+		slog.Info("wg.Wait")
 	}
 
 	// NOW it's safe to close the que channels since no wssHandle goroutines are running
 	if this.que != nil {
 		this.que.Close(time.Second * 20)
+		slog.Info("que.Close")
 	}
+
+	slog.Info("bottom closeAndWait")
 
 	done <- true // we're done
 }
