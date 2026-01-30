@@ -80,7 +80,12 @@ func (this *Server) wssHandle (w http.ResponseWriter, r *http.Request) {
 		if mType != 1 { continue } // only passing along 1 types right now, utf8
 
 		if this.reader != nil {
-			this.reader (msg) // we have a specific reader, so do use that instead
+			// process in its own goroutine for concurrent handling
+			this.wg.Add(1)
+			go func(m []byte) {
+				defer this.wg.Done()
+				this.reader(m)
+			}(msg)
 		} else {
 			this.que.NewMsg (msg) // repeat this to everyone
 		}
