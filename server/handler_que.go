@@ -11,6 +11,7 @@ import (
 
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"log/slog"
 )
@@ -36,6 +37,11 @@ func (this *Server) wssErr (err error) {
 
 	if strings.Contains(err.Error(), "use of closed network connection") {
 		return // happens when we close the client while the reader is still waiting for data
+	}
+
+	// check for timeout error during shutdown - this is expected
+	if os.IsTimeout(err) && this.closing {
+		return // expected during graceful shutdown
 	}
 
 	// this is probably bad, so record it

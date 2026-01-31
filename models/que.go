@@ -74,17 +74,15 @@ func (this *Que) monitorMessages () {
 
 		// we now need to send this message to all connected services
 		for _, conn := range this.list {
-			if conn.ctx.Err() == nil {
-				err := conn.client.WriteMessage (1, msg.Msg) // write it out
-				if err == nil {
-					newList = append (newList, conn) // this one is still working, so keep it
-
-				} else {
-					// going to record these for now
-					slog.Info("client write failed, removing from que list")
-				}
-			} else { // the context is gone, so don't include it anymore
-				slog.Info("client write failed bad context", "error", conn.ctx.Err(), "msg", string(msg.Msg))
+			// just try to write - the write will fail if connection is bad
+			// don't skip based on ctx.Err() because context gets canceled during shutdown
+			// but we still want to write messages during graceful shutdown
+			err := conn.client.WriteMessage (1, msg.Msg) // write it out
+			if err == nil {
+				newList = append (newList, conn) // this one is still working, so keep it
+			} else {
+				// going to record these for now
+				slog.Info("client write failed, removing from que list", "error", err.Error())
 			}
 		}
 
@@ -105,8 +103,19 @@ func (this *Que) closeAndWait (ch chan bool) {
 	slog.Info ("QUE: close and wait")
 }
 
-// CloseConnections closes all websocket connections to unblock any ReadMessage() calls
-// Call this before waiting for handlers to finish, then call Close() after
+// SetReadDeadlines sets a short read deadline on all connections to unblock ReadMessage() calls
+// This allows handlers to exit gracefully while keeping connections open for writes
+func (this *Que) SetReadDeadlines () {
+	for _, conn := range this.list {
+		if conn.client != nil {
+			// set deadline in the past to immediately unblock ReadMessage()
+			conn.client.SetReadDeadline(time.Now().Add(time.Millisecond))
+		}
+	}
+	slog.Info (fmt.Sprintf("QUE: set read deadlines on %d connections", len(this.list)))
+}
+
+// CloseConnections closes all websocket connections
 func (this *Que) CloseConnections () {
 	for _, conn := range this.list {
 		if conn.client != nil {
