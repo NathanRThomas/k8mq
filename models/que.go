@@ -103,18 +103,6 @@ func (this *Que) closeAndWait (ch chan bool) {
 	slog.Info ("QUE: close and wait")
 }
 
-// SetReadDeadlines sets a short read deadline on all connections to unblock ReadMessage() calls
-// This allows handlers to exit gracefully while keeping connections open for writes
-func (this *Que) SetReadDeadlines () {
-	for _, conn := range this.list {
-		if conn.client != nil {
-			// set deadline in the past to immediately unblock ReadMessage()
-			conn.client.SetReadDeadline(time.Now().Add(time.Millisecond))
-		}
-	}
-	slog.Info (fmt.Sprintf("QUE: set read deadlines on %d connections", len(this.list)))
-}
-
 // CloseConnections closes all websocket connections
 func (this *Que) CloseConnections () {
 	for _, conn := range this.list {

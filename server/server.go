@@ -61,13 +61,6 @@ func (this *Server) closeAndWait (ctx context.Context, done chan bool) {
 		slog.Info("svr shutdown")
 	}
 
-	// set read deadlines to unblock ReadMessage() calls WITHOUT closing connections
-	// this allows handlers to exit their read loops while still being able to write
-	if this.que != nil {
-		this.que.SetReadDeadlines()
-		slog.Info("que.SetReadDeadlines")
-	}
-
 	if this.wg != nil {
 		// wait for launchServer AND all wssHandle goroutines to finish
 		// handlers can still write messages during this time since connections are open
